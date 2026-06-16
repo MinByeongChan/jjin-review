@@ -2,8 +2,8 @@
 
 :root {
   color-scheme: light;
-  --background: #f7f5f0;
-  --foreground: #191714;
+  --background: #f7faf6;
+  --foreground: #161914;
 }
 
 * {
@@ -25,4 +25,26 @@ button,
 input,
 textarea {
   font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+textarea,
+input {
+  max-width: 100%;
+}
+
+::selection {
+  background: #bfe3d5;
+  color: #0f211c;
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+.text-pretty {
+  text-wrap: pretty;
 }
