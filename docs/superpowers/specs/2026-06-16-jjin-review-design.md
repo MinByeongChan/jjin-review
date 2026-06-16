@@ -1,106 +1,112 @@
-# 찐 후기 MVP Design
+# 찐 후기 MVP 설계서
 
-## Goal
+## 목표
 
-`찐 후기` is a web app that helps users judge whether public product reviews feel authentic or promotional. Users enter a product name or product URL. The app searches public web sources, filters for useful review signals, and returns a concise buying-oriented summary with authenticity and advertising suspicion scores.
+`찐 후기`는 사용자가 제품명이나 상품 URL을 입력하면 공개 웹에 있는 후기를 바탕으로 광고성/협찬성 신호를 걷어내고, 구매 판단에 도움 되는 내용을 정리해주는 웹앱이다.
 
-The MVP keeps the main promise simple: enter a product and get a trusted review digest. If public web evidence is insufficient, the app asks the user to paste reviews and analyzes those with the same criteria.
+MVP의 핵심 약속은 단순하다.
 
-## Scope
+> 제품명이나 URL만 넣으면, 공개 웹 후기를 찾아서 찐 후기 중심으로 요약해준다.
 
-In scope:
+공개 웹에서 충분한 근거를 찾지 못한 경우에는 실패로 끝내지 않고, 사용자가 보유한 리뷰 텍스트를 붙여넣어 같은 기준으로 분석할 수 있게 한다.
 
-- Product name or URL input.
-- Public web review search through the OpenAI API.
-- Automatic product/category inference.
-- Hybrid fallback to pasted review text when web evidence is weak.
-- Result view with one-line conclusion, scores, evidence summary, warning patterns, buying checklist, and collapsible sources.
-- Server-side OpenAI API calls only.
+## 범위
 
-Out of scope for MVP:
+MVP에 포함한다:
 
-- Crawling private or login-gated shopping mall review tabs.
-- Browser extension integration.
-- User accounts, saved history, payments, and sharing.
-- Claims that the app can prove whether a review is fake.
+- 제품명 또는 상품 URL 입력
+- OpenAI API 기반 공개 웹 후기 검색
+- 제품명, URL, 제품군 자동 추론
+- 공개 웹 근거가 부족할 때 리뷰 붙여넣기 분석 제공
+- 한 줄 결론, 점수, 근거 요약, 광고 의심 패턴, 구매 전 체크리스트, 접을 수 있는 출처 목록
+- OpenAI API 호출은 서버에서만 수행
 
-## User Flow
+MVP에서 제외한다:
 
-1. The first screen shows one central input:
+- 로그인이나 권한이 필요한 쇼핑몰 리뷰 탭 크롤링
+- 브라우저 확장 프로그램
+- 사용자 계정, 분석 기록 저장, 결제, 공유 기능
+- 특정 리뷰가 가짜라고 단정하는 표현
+
+## 사용자 흐름
+
+1. 첫 화면에는 중앙 입력창 하나를 보여준다.
    `제품명 또는 상품 URL을 입력해주세요`
-2. The user submits a product name, brand plus product name, or URL.
-3. The server interprets the input, searches public web sources, and asks the model to classify review usefulness and promotional risk.
-4. If evidence is sufficient, the app shows the analysis result.
-5. If evidence is weak, the app shows:
+2. 사용자는 제품명, 브랜드와 제품명, 또는 상품 URL을 입력한다.
+3. 서버는 입력값이 URL인지 검색어인지 판단하고, 공개 웹에서 후기성 출처를 찾는다.
+4. LLM은 출처의 구체성, 실사용 맥락, 광고/협찬 가능성, 구매 판단에 필요한 정보를 분석한다.
+5. 근거가 충분하면 분석 결과를 바로 보여준다.
+6. 근거가 부족하면 다음 문구와 함께 보완 입력창을 보여준다.
    `웹에서 충분한 후기를 찾지 못했어요. 가지고 있는 리뷰를 붙여넣으면 같은 기준으로 분석해드릴게요.`
-6. The user can paste review text and receive the same result format.
+7. 사용자가 리뷰 텍스트를 붙여넣으면 같은 결과 형식으로 다시 분석한다.
 
-## Result Structure
+## 결과 구조
 
-The analysis result contains:
+분석 결과는 다음 항목으로 구성한다:
 
-- `headline`: one-line buying conclusion.
-- `scores`: authenticity confidence, advertising suspicion, and purchase satisfaction.
-- `summary`: short explanation of the overall pattern.
-- `recommendedFor`: who may like the product.
-- `cautionFor`: who should be careful.
-- `pros`: concrete positive points from reviews.
-- `cons`: concrete negative points from reviews.
-- `adSignals`: promotional or low-trust patterns.
-- `checklist`: things to verify before purchase.
-- `sources`: collapsible source list with title, URL, source type, and reliability note.
-- `needsUserReviews`: whether fallback pasted reviews should be requested.
+- `headline`: 구매 판단을 돕는 한 줄 결론
+- `scores`: 찐 후기 신뢰도, 광고 의심도, 구매 만족도
+- `summary`: 전체 후기 패턴 요약
+- `recommendedFor`: 이런 사람에게 추천
+- `cautionFor`: 이런 사람은 주의
+- `pros`: 구체적으로 반복 언급된 장점
+- `cons`: 구체적으로 반복 언급된 단점
+- `adSignals`: 광고성 또는 낮은 신뢰도의 신호
+- `checklist`: 구매 전 확인할 점
+- `sources`: 접어서 볼 수 있는 출처 목록
+- `needsUserReviews`: 공개 웹 근거가 부족해 붙여넣기 분석이 필요한지 여부
 
-## Analysis Logic
+## 분석 로직
 
-The app treats the LLM as an evidence organizer, not an oracle.
+이 서비스에서 LLM은 정답을 단정하는 판정기가 아니라, 공개된 근거를 정리하고 의심도를 표시하는 분석 보조자다.
 
-Server-side analysis steps:
+서버 분석 단계:
 
-1. Parse whether the input is a URL or product query.
-2. Infer product name and likely category.
-3. Search public web sources for review-oriented evidence.
-4. Prefer concrete experience signals such as long-term use, detailed defects, comparisons, photos/videos mentioned in text, and specific context.
-5. Flag low-trust signals such as sponsorship disclosure, affiliate-heavy language, repetitive praise, spec-only writing, or no concrete usage context.
-6. Generate structured JSON for the UI.
-7. Mark `needsUserReviews` when source count, source diversity, or review specificity is too low.
+1. 입력값이 URL인지 제품 검색어인지 판별한다.
+2. 제품명과 제품군을 추론한다.
+3. 공개 웹에서 후기성 근거를 검색한다.
+4. 장기 사용, 구체적 불편, 비교 경험, 사용 상황, 사진/영상 언급처럼 실사용 신호가 있는 내용을 우선한다.
+5. 협찬/체험단/파트너스 문구, 반복적인 극찬, 스펙 나열 위주 글, 사용 맥락 부족 같은 낮은 신뢰도 신호를 표시한다.
+6. UI에서 안정적으로 렌더링할 수 있도록 구조화된 JSON을 생성한다.
+7. 출처 수, 출처 다양성, 후기 구체성이 부족하면 `needsUserReviews`를 `true`로 표시한다.
 
-## Architecture
+## 아키텍처
 
-The MVP is a Next.js app.
+MVP는 Next.js 앱으로 만든다.
 
-- `app/page.tsx`: single-page chat-like interface and result states.
-- `app/api/analyze/route.ts`: server route that calls the OpenAI API.
-- `lib/analysis/schema.ts`: shared TypeScript types and default result helpers.
-- `lib/analysis/prompt.ts`: prompt construction and output instructions.
+- `app/page.tsx`: ChatGPT처럼 단순한 단일 페이지 UI, 입력/로딩/결과/붙여넣기 상태 관리
+- `app/api/analyze/route.ts`: OpenAI API를 호출하는 서버 라우트
+- `lib/analysis/schema.ts`: 요청/응답 타입, 점수 라벨, 개발용 샘플 결과
+- `lib/analysis/prompt.ts`: 프롬프트 구성과 JSON 출력 지침
 
-The OpenAI API key is stored in `OPENAI_API_KEY` and used only on the server.
+OpenAI API 키는 `OPENAI_API_KEY` 환경 변수로 관리하고, 클라이언트에 노출하지 않는다.
 
-## Error Handling
+## 오류 처리
 
-- Missing input: show an inline validation message.
-- Missing API key: return a friendly setup error in development.
-- OpenAI/API failure: show a retryable error state.
-- Invalid model JSON: return a safe fallback result explaining that the analysis could not be completed.
-- Weak web evidence: do not fail; ask for pasted reviews.
+- 입력값이 없으면 입력창 아래에 검증 메시지를 보여준다.
+- API 키가 없으면 개발 중 확인 가능한 샘플 분석 결과를 반환한다.
+- OpenAI API 호출 실패 시 재시도 가능한 오류 상태를 보여준다.
+- 모델 응답 JSON 파싱에 실패하면 안전한 실패 결과를 반환한다.
+- 공개 웹 근거가 부족한 경우에는 실패가 아니라 리뷰 붙여넣기 흐름으로 이어간다.
 
-## Testing
+## 테스트 및 검증
 
-Initial verification:
+초기 검증 항목:
 
-- TypeScript/build check.
-- Manual browser test for:
-  - product-name input
-  - URL input
-  - weak evidence fallback
-  - pasted review analysis
-  - error state when API key is missing
+- TypeScript 타입 검사
+- 프로덕션 빌드
+- 브라우저에서 제품명 입력 분석 확인
+- 브라우저에서 URL 입력 분석 확인
+- API 키가 없는 개발 환경에서 샘플 결과 확인
+- 공개 웹 근거 부족 시 리뷰 붙여넣기 화면 확인
+- 출처 접기/펼치기 동작 확인
+- 모바일과 데스크톱에서 텍스트 겹침이 없는지 확인
 
-Automated tests can be added after the MVP once the prompt contract stabilizes.
+프롬프트와 JSON 계약이 안정된 뒤 자동화 테스트를 추가한다.
 
-## Product Principles
+## 제품 원칙
 
-- Keep the first screen simple.
-- Show confidence and sources instead of pretending certainty.
-- Avoid accusing specific reviewers or sellers of fraud.
-- Make the fallback path feel helpful, not like a failure.
+- 첫 화면은 최대한 단순하게 유지한다.
+- 확신을 가장하지 않고 점수와 근거를 함께 보여준다.
+- 특정 리뷰어, 판매자, 브랜드를 사기라고 단정하지 않는다.
+- 보완 입력 흐름은 실패가 아니라 더 정확한 분석으로 이어지는 길처럼 느껴지게 만든다.
