@@ -70,16 +70,31 @@ export async function POST(request: Request) {
       result: normalized
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "알 수 없는 오류";
+    const message = getFriendlyErrorMessage(error);
 
     return NextResponse.json({
       ok: true,
       result: createSafeFailureResult(
         query,
-        `분석 중 문제가 발생했어요. 잠시 후 다시 시도하거나 리뷰를 붙여넣어 분석해주세요. 오류: ${message}`
+        message,
+        pastedReviews ? "pasted" : "web"
       )
     });
   }
+}
+
+function getFriendlyErrorMessage(error: unknown) {
+  const raw = error instanceof Error ? error.message : "";
+
+  if (raw.includes("429") || raw.toLowerCase().includes("quota")) {
+    return "OpenAI API 사용량 또는 결제 한도 때문에 분석을 완료하지 못했어요. 프로젝트 사용량과 결제 상태를 확인한 뒤 다시 시도해주세요.";
+  }
+
+  if (raw.toLowerCase().includes("api key")) {
+    return "OpenAI API 키 설정을 확인해야 해요. 키가 올바르게 저장되어 있는지 확인한 뒤 다시 시도해주세요.";
+  }
+
+  return "분석 중 문제가 발생했어요. 잠시 후 다시 시도하거나 리뷰를 붙여넣어 분석해주세요.";
 }
 
 function parseModelJson(text: string) {
@@ -119,6 +134,22 @@ function normalizeResult(
   const sample = createSampleResult(query, mode === "pasted");
   const scores = value.scores ?? sample.scores;
   const sources = Array.isArray(value.sources) ? value.sources : [];
+  const needsUserReviews =
+    typeof value.needsUserReviews === "boolean"
+      ? value.needsUserReviews
+      : mode === "web" && sources.length < 3;
+  const weakEvidenceFallback = {
+    recommendedFor: ["공개 웹 근거가 부족해 추천 대상을 단정하기 어려워요."],
+    cautionFor: ["후기 수가 적은 상태에서 바로 구매를 결정하려는 사람은 추가 확인이 필요해요."],
+    pros: ["공개 웹 근거가 부족해 반복된 장점을 확인하지 못했어요."],
+    cons: ["공개 웹 근거가 부족해 반복된 단점을 확인하지 못했어요."],
+    adSignals: ["출처와 후기 수가 부족해 광고 의심 패턴을 안정적으로 분리하지 못했어요."],
+    checklist: [
+      "사용자 리뷰를 추가로 붙여넣어 다시 분석하기",
+      "장기 사용 후기가 있는지 확인하기",
+      "단점이 구체적으로 적힌 리뷰를 우선해서 보기"
+    ]
+  };
 
   return {
     productName: stringOr(value.productName, sample.productName),
@@ -151,22 +182,31 @@ function normalizeResult(
         )
       }
     },
-    recommendedFor: stringListOr(value.recommendedFor, sample.recommendedFor),
-    cautionFor: stringListOr(value.cautionFor, sample.cautionFor),
-    pros: stringListOr(value.pros, sample.pros),
-    cons: stringListOr(value.cons, sample.cons),
-    adSignals: stringListOr(value.adSignals, sample.adSignals),
-    checklist: stringListOr(value.checklist, sample.checklist),
+    recommendedFor: stringListOr(
+      value.recommendedFor,
+      needsUserReviews ? weakEvidenceFallback.recommendedFor : sample.recommendedFor
+    ),
+    cautionFor: stringListOr(
+      value.cautionFor,
+      needsUserReviews ? weakEvidenceFallback.cautionFor : sample.cautionFor
+    ),
+    pros: stringListOr(value.pros, needsUserReviews ? weakEvidenceFallback.pros : sample.pros),
+    cons: stringListOr(value.cons, needsUserReviews ? weakEvidenceFallback.cons : sample.cons),
+    adSignals: stringListOr(
+      value.adSignals,
+      needsUserReviews ? weakEvidenceFallback.adSignals : sample.adSignals
+    ),
+    checklist: stringListOr(
+      value.checklist,
+      needsUserReviews ? weakEvidenceFallback.checklist : sample.checklist
+    ),
     sources: sources.map((source: Partial<ReviewAnalysisResult["sources"][number]>) => ({
       title: stringOr(source.title, "출처 제목 없음"),
       url: stringOr(source.url, ""),
       type: sourceTypeOrUnknown(source.type),
       reliabilityNote: stringOr(source.reliabilityNote, "출처 신뢰도 설명이 부족합니다.")
     })),
-    needsUserReviews:
-      typeof value.needsUserReviews === "boolean"
-        ? value.needsUserReviews
-        : mode === "web" && sources.length < 3,
+    needsUserReviews,
     mode
   };
 }

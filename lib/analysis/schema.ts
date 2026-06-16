@@ -129,7 +129,11 @@ export function createSampleResult(query: string, hasPastedReviews = false): Rev
   };
 }
 
-export function createSafeFailureResult(query: string, reason: string): ReviewAnalysisResult {
+export function createSafeFailureResult(
+  query: string,
+  reason: string,
+  mode: ReviewAnalysisResult["mode"] = "sample"
+): ReviewAnalysisResult {
   return {
     ...createSampleResult(query, false),
     headline: "분석 결과를 안정적으로 만들지 못했어요. 리뷰를 붙여넣으면 같은 기준으로 다시 분석할 수 있어요.",
@@ -151,7 +155,18 @@ export function createSafeFailureResult(query: string, reason: string): ReviewAn
         description: "분석 실패로 점수를 계산하지 못했습니다."
       }
     },
+    recommendedFor: ["분석이 정상 완료된 뒤 추천 대상을 다시 확인해주세요."],
+    cautionFor: ["API 설정이나 사용량 제한 문제가 해결되기 전에는 결과를 구매 판단에 사용하지 마세요."],
+    pros: ["분석 실패로 반복 장점을 확인하지 못했습니다."],
+    cons: ["분석 실패로 반복 단점을 확인하지 못했습니다."],
+    adSignals: ["분석 실패로 광고 의심 패턴을 확인하지 못했습니다."],
+    checklist: [
+      "잠시 후 다시 분석하기",
+      "API 사용량과 결제 상태 확인하기",
+      "보유한 리뷰를 붙여넣어 다시 시도하기"
+    ],
+    sources: [],
     needsUserReviews: true,
-    mode: "sample"
+    mode
   };
 }
