@@ -38,7 +38,6 @@ export default function Home() {
 
   useEffect(() => {
     if (!isLoading) {
-      setLoadingStep(0);
       return;
     }
 
@@ -64,6 +63,7 @@ export default function Home() {
     }
 
     setError("");
+    setLoadingStep(0);
     setIsLoading(true);
     setShowSources(false);
 
@@ -109,6 +109,7 @@ export default function Home() {
     setPastedReviews("");
     setResult(null);
     setError("");
+    setLoadingStep(0);
     setShowSources(false);
   }
 
